@@ -1,0 +1,13 @@
+[Unit]
+Description=Agoric Cosmos daemon
+After=network-online.target
+
+[Service]
+User=root
+ExecStart=/root/go/bin/ag-chain-cosmos start --log_level=warn
+Restart=on-failure
+RestartSec=3
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

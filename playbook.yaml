@@ -1,0 +1,127 @@
+---
+- name: Agoric Installer
+  hosts: agoric
+
+  tasks:
+    - name: Get NODE.JS 12 installer
+      get_url:
+        url: https://deb.nodesource.com/setup_12.x
+        dest: ~/setup_12.x
+
+    - name: Chmod NODE.JS 12 installer
+      file:
+        path: ~/setup_12.x
+        mode: '0755'
+
+    - name: Run node installer
+      shell: "~/setup_12.x"
+
+    - name: Download YARN key
+      get_url:
+        url: https://dl.yarnpkg.com/debian/pubkey.gpg
+        dest: ~/yarn-pubkey.gpg
+
+    - name: Install YARN key
+      command: apt-key add ~/yarn-pubkey.gpg
+
+    - name: Get extra repos
+      copy:
+        dest: /etc/apt/sources.list.d/yarn.list
+        content: "deb https://dl.yarnpkg.com/debian/ stable main"
+
+    - name: Install packages
+      apt:
+        update_cache: yes
+        name:
+          - nodejs=12.*
+          - yarn
+          - build-essential
+          - jq
+          - git
+
+    - name: Download GO
+      get_url: 
+        url: https://golang.org/dl/go1.15.7.linux-amd64.tar.gz
+        dest: ~/go1.15.7.linux-amd64.tar.gz
+
+    - name: Unpack GO
+      unarchive:
+        src: ~/go1.15.7.linux-amd64.tar.gz
+        dest: ~/
+        remote_src: yes
+
+    - name: HOME
+      lineinfile:
+        path: ~/.profile
+        regexp: "^export HOME"
+        line: "export HOME=/root"
+
+    - name: GOPATH
+      lineinfile:
+        path: ~/.profile
+        regexp: "^export GOPATH"
+        line: "export GOPATH=$HOME/go"
+
+    - name: GOBIN
+      lineinfile:
+        path: ~/.profile
+        regexp: "^export GOBIN"
+        line: "export GOBIN=$GOPATH/bin"
+
+    - name: PATH
+      lineinfile:
+        path: ~/.profile
+        regexp: "^export PATH=.*GOBIN"
+        line: "export PATH=$PATH:$GOBIN"
+  
+    - name: Fetch SDK
+      git:
+        repo: 'https://github.com/Agoric/agoric-sdk'
+        dest: ~/agoric-sdk
+        version: 'v0.24.0'
+
+    - name: yarn install
+      shell:
+        chdir: ~/agoric-sdk
+        cmd: "yarn install"
+
+    - name: yarn build
+      shell:
+        chdir: ~/agoric-sdk
+        cmd: "yarn build"
+
+    - name: Build Cosmos
+      command: "/bin/bash -x -e -c 'source ~/.profile ; cd /root/agoric-sdk/packages/cosmic-swingset; make'"
+
+    - name: Create moniker file
+      copy:
+        content: "{{moniker}}"
+        dest: ~/moniker
+
+    - name: Copy Prepare Chain script
+      copy:
+        src: init_chain.sh
+        dest: ~/
+
+    - name: Chmod Prepare Chain script
+      file:
+        path: ~/init_chain.sh
+        mode: '0755'
+
+    - name: Run Prepare Chain script
+      command: "/bin/bash -x -e -c 'source ~/.profile ; cd /root; ./init_chain.sh'"
+      
+  
+    - name: Install agoric service
+      copy:
+        src: agoric.service
+        dest: /etc/systemd/system/agoric.service
+
+    - name: Start agoric
+      systemd:
+        state: started
+        enabled: yes
+        daemon_reload: yes
+        name: agoric
+
+   
